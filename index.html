@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Time & Frame Converter | Timecode ↔ Frames ↔ Seconds (DF/NDF)</title>
+  <meta name="description" content="Convert between timecode (HH:MM:SS:FF), frames, seconds, and HH:MM:SS across all common frame rates. Supports 23.976/24/25/29.97/30/59.94/60/120 and drop-frame. Built for editors, filmmakers, and animators." />
+  <meta name="keywords" content="timecode converter, frame calculator, fps converter, drop frame, 29.97, 59.94, video editing, film, animation, post production, HH:MM:SS:FF" />
+  <meta name="author" content="MA Projects" />
+  <meta name="robots" content="index, follow" />
+
+  <style>
+    :root { --bg:#f7fafc; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --accent:#0f172a; --hintbg:#eef2f7; }
+    html.dark { --bg:#0b1220; --card:#0f172a; --ink:#e5e7eb; --muted:#9aa5b1; --line:#223047; --accent:#60a5fa; --hintbg:#111827; }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:var(--bg); color:var(--ink)}
+    .wrap{max-width:1100px; margin:0 auto; padding:24px}
+    .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px}
+    .grid{display:grid; gap:12px}
+    @media(min-width:1000px){ .grid.cols-3{grid-template-columns:repeat(3,1fr)} .grid.cols-2{grid-template-columns:1fr 1fr} }
+    label{font-size:13px; color:var(--muted); display:block; margin-bottom:6px}
+    input,select,button,textarea{font:inherit}
+    input[type=text],input[type=number],select,textarea{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--ink)}
+    input:focus,select:focus,textarea:focus{border-color:#94a3b8; box-shadow:0 0 0 3px rgba(148,163,184,.25)}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+
+    /* Accessible pills/buttons */
+    .pill{display:inline-block; padding:7px 12px; border:1px solid var(--line); border-radius:999px; background:var(--card); color:var(--ink); cursor:pointer; line-height:1; transition:all .15s ease}
+    .pill:hover{filter:brightness(.98)}
+    .pill:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+    .pill.active{background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 0 0 3px rgba(96,165,250,.25)}
+    .pill:not(.active){opacity:.82}
+    html.dark .pill{background:#111827; color:var(--ink); border-color:#334155}
+    html.dark .pill:hover{filter:brightness(1.1)}
+    html.dark .pill.active{background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 0 0 3px rgba(96,165,250,.35)}
+
+    .fpsbar{display:flex; flex-wrap:wrap; gap:8px}
+    .picker-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px}
+    .row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px dashed var(--line)}
+    .row:last-child{border-bottom:0}
+    .label{color:var(--muted); font-size:13px}
+    .value{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .faded{opacity:.45; pointer-events:none}
+    .hidden{display:none}
+    .invalid{border-color:#ef4444 !important; box-shadow:0 0 0 3px rgba(239,68,68,.25) !important}
+
+    /* Ad containers (pure placeholders; no JS) */
+    .ad { border:1px dashed var(--line); background:var(--hintbg); color:var(--muted); border-radius:12px; padding:12px; text-align:center; font-size:12px; }
+    .ad-top{ min-height:90px; margin:12px 0; }
+    .ad-inline{ min-height:250px; margin:16px 0; }
+    .ad-sticky{ position:sticky; bottom:0; border-radius:12px 12px 0 0; min-height:90px; }
+
+    /* Ko‑fi CTA */
+    .pill-cta{background:#ffdd00; color:#111; border-color:#e6c800}
+    html.dark .pill-cta{background:#ffd200; color:#111; border-color:#e6c000}
+    .pill-cta:hover{filter:brightness(1.03)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Time & Frame Converter — Timecode, Frames & Seconds (DF/NDF)</h1>
+      <p class="mono" style="color:var(--muted)">Convert SS ⇄ MM:SS ⇄ HH:MM:SS ⇄ HH:MM:SS:FF and frames at any FPS, including 29.97/59.94 drop-frame. Professional defaults: examples in placeholders; Reset returns to zeros.</p>
+
+      <!-- SAFE Ad placeholder (no AdSense JS) -->
+      <div class="ad ad-top">Header Ad Placeholder (insert AdSense when live)</div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0">
+        <div class="card" style="display:flex; gap:8px; align-items:center">
+          <span style="color:var(--muted); font-size:13px">Theme</span>
+          <button id="theme-light" class="pill" type="button">Light</button>
+          <button id="theme-dark" class="pill" type="button">Dark</button>
+        </div>
+        <div class="card" style="display:flex; gap:8px; align-items:center">
+          <span style="color:var(--muted); font-size:13px">3-field interpretation</span>
+          <select id="interpret-3"><option value="hms" selected>HH:MM:SS</option><option value="msf">MM:SS:FF</option></select>
+        </div>
+        <div class="card" style="display:flex; gap:8px; align-items:center">
+          <label style="margin:0">Drop-frame</label>
+          <input type="checkbox" id="drop-frame" /> <span class="mono" style="color:var(--muted)">29.97/59.94 only</span>
+        </div>
+        <div class="card" style="display:flex; justify-content:center; align-items:center;">
+          <a class="pill pill-cta" href="https://ko-fi.com/yourname" target="_blank" rel="noopener">☕ Support This Tool</a>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <label>Frame rate (FPS)</label>
+      <div class="fpsbar" id="fps-pills"></div>
+      <div class="grid cols-2" style="margin-top:8px">
+        <div id="custom-fps-wrap" class="faded">
+          <label>Custom FPS</label>
+          <input type="number" id="custom-fps" min="1" step="0.001" value="48" disabled />
+        </div>
+        <div>
+          <label>Using FPS</label>
+          <input type="text" id="active-fps" value="24" disabled />
+        </div>
+      </div>
+    </section>
+
+    <!-- SAFE In-Content Ad placeholder -->
+    <div class="ad ad-inline">In-Content Ad Placeholder (insert AdSense when live)</div>
+
+    <section class="grid cols-3" style="margin-top:12px">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center"><h3 style="margin:0">Flexible → Conversions</h3><button id="reset-flex" class="pill" type="button">Reset</button></div>
+        <label>Enter time (SS, MM:SS, HH:MM:SS, or HH:MM:SS:FF)</label>
+        <input id="flex-input" type="text" placeholder="e.g. 90 · 01:30 · 00:01:30 · 00:01:30:12" value="00:00:00:00" />
+        <p class="mono" id="flex-echo" style="color:var(--muted)"></p>
+        <div class="picker-grid">
+          <div><label>Hours</label><select id="pick-h"></select></div>
+          <div><label>Minutes</label><select id="pick-m"></select></div>
+          <div><label>Seconds</label><select id="pick-s"></select></div>
+          <div><label>Frames</label><select id="pick-f"></select></div>
+        </div>
+        <div style="margin-top:8px">
+          <div class="row"><span class="label">Seconds</span><span id="out-flex-seconds" class="value">—</span></div>
+          <div class="row"><span class="label">MM:SS</span><span id="out-flex-ms" class="value">—</span></div>
+          <div class="row"><span class="label">HH:MM:SS</span><span id="out-flex-hms" class="value">—</span></div>
+          <div class="row"><span class="label">Total Frames</span><span id="out-flex-frames" class="value">—</span></div>
+          <div class="row"><span class="label">HH:MM:SS:FF @ <span id="hmsf-fps-label">24</span>FPS</span><span id="out-flex-hmsf" class="value">—</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center"><h3 style="margin:0">Seconds ↔︎ (MM:SS / HH:MM:SS / Frames)</h3><button id="reset-seconds" class="pill" type="button">Reset</button></div>
+        <label>Seconds</label>
+        <input id="seconds-input" type="number" placeholder="e.g. 90" value="0" />
+        <p class="mono" id="sec-echo" style="color:var(--muted)"></p>
+        <div style="margin-top:8px">
+          <div class="row"><span class="label">MM:SS</span><span id="out-sec-ms" class="value">—</span></div>
+          <div class="row"><span class="label">HH:MM:SS</span><span id="out-sec-hms" class="value">—</span></div>
+          <div class="row"><span class="label">Total Frames</span><span id="out-sec-frames" class="value">—</span></div>
+          <div class="row"><span class="label">HH:MM:SS:FF @ <span class="hmsf-fps">24</span>FPS</span><span id="out-sec-hmsf" class="value">—</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center"><h3 style="margin:0">HH:MM:SS:FF → (Seconds / MM:SS / Frames)</h3><button id="reset-hmsf" class="pill" type="button">Reset</button></div>
+        <label>Timecode</label>
+        <input id="hmsf-input" type="text" placeholder="e.g. 00:01:30:00" value="00:00:00:00" />
+        <p class="mono" id="hmsf-echo" style="color:var(--muted)"></p>
+        <div class="picker-grid">
+          <div><label>Hours</label><select id="hmsf-h"></select></div>
+          <div><label>Minutes</label><select id="hmsf-m"></select></div>
+          <div><label>Seconds</label><select id="hmsf-s"></select></div>
+          <div><label>Frames</label><select id="hmsf-f"></select></div>
+        </div>
+        <div style="margin-top:8px">
+          <div class="row"><span class="label">Seconds</span><span id="out-hmsf-seconds" class="value">—</span></div>
+          <div class="row"><span class="label">MM:SS</span><span id="out-hmsf-ms" class="value">—</span></div>
+          <div class="row"><span class="label">Total Frames</span><span id="out-hmsf-frames" class="value">—</span></div>
+          <div class="row"><span class="label">HH:MM:SS</span><span id="out-hmsf-hms" class="value">—</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SAFE In-Content Ad placeholder -->
+    <div class="ad ad-inline">In-Content Ad Placeholder (insert AdSense when live)</div>
+
+    <section class="card" style="margin-top:12px">
+      <div style="display:flex; justify-content:space-between; align-items:center"><h3 style="margin:0">Multiply / Divide</h3><button id="reset-calc" class="pill" type="button">Reset</button></div>
+      <div class="grid cols-2">
+        <div>
+          <label>Input (SS, MM:SS, HH:MM:SS, or HH:MM:SS:FF)</label>
+          <input id="calc-input" type="text" placeholder="e.g. 03:30:12" value="00:00:00:00" />
+          <p class="mono" id="calc-echo" style="color:var(--muted)"></p>
+          <div class="picker-grid">
+            <div><label>Hours</label><select id="calc-h"></select></div>
+            <div><label>Minutes</label><select id="calc-m"></select></div>
+            <div><label>Seconds</label><select id="calc-s"></select></div>
+            <div><label>Frames</label><select id="calc-f"></select></div>
+          </div>
+        </div>
+        <div>
+          <div class="grid cols-2">
+            <div>
+              <label>Operator</label>
+              <select id="calc-op"><option value="mul">×</option><option value="div" selected>÷</option></select>
+            </div>
+            <div>
+              <label>By</label>
+              <input id="calc-by" type="number" step="any" value="1" />
+            </div>
+          </div>
+          <div class="card" style="margin-top:8px">
+            <div class="row"><span class="label">HH:MM:SS:FF</span><span id="calc-out-hmsf" class="value">—</span></div>
+            <div class="row"><span class="label">HH:MM:SS</span><span id="calc-out-hms" class="value">—</span></div>
+            <div class="row"><span class="label">MM:SS</span><span id="calc-out-ms" class="value">—</span></div>
+            <div class="row"><span class="label">Seconds</span><span id="calc-out-seconds" class="value">—</span></div>
+            <div class="row"><span class="label">Frames</span><span id="calc-out-frames" class="value">—</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <div style="display:flex; justify-content:space-between; align-items:center"><h3 style="margin:0">Add / Subtract</h3><button id="reset-add" class="pill" type="button">Reset</button></div>
+      <div class="grid cols-2">
+        <div>
+          <label>Operation</label>
+          <select id="add-op"><option value="sum" selected>Add (Σ)</option><option value="diff">Subtract (first − rest)</option></select>
+        </div>
+        <div>
+          <label><input type="checkbox" id="add-more-toggle" /> Add more than 2 inputs</label>
+          <div id="add-count-wrap" class="hidden" style="margin-top:6px">
+            <label>Total number of inputs (max 10)</label>
+            <select id="add-count"></select>
+          </div>
+        </div>
+      </div>
+      <div id="add-list" style="margin-top:8px"></div>
+      <div class="card" style="margin-top:8px">
+        <div class="row"><span class="label">HH:MM:SS:FF</span><span id="add-out-hmsf" class="value">—</span></div>
+        <div class="row"><span class="label">HH:MM:SS</span><span id="add-out-hms" class="value">—</span></div>
+        <div class="row"><span class="label">MM:SS</span><span id="add-out-ms" class="value">—</span></div>
+        <div class="row"><span class="label">Seconds</span><span id="add-out-seconds" class="value">—</span></div>
+        <div class="row"><span class="label">Frames</span><span id="add-out-frames" class="value">—</span></div>
+      </div>
+    </section>
+
+    <div class="ad ad-sticky" style="margin-top:16px">Sticky Footer Ad Placeholder (insert AdSense when live)</div>
+
+    <!-- SEO Content Block: About (batch references removed) -->
+    <section class="card" style="margin-top:16px">
+      <h2 style="margin:0 0 8px">About the Time & Frame Converter</h2>
+      <p style="color:var(--muted)">A precise timecode calculator for post-production: convert between frames, seconds, and timecode across common frame rates (12, 24, 25, 29.97, 30, 59.94, 60, 120) with support for drop-frame notation (<span class="mono">HH:MM:SS;FF</span>). Built for video editors, filmmakers, and animators who need reliable results without fractional minutes.</p>
+      <h3 style="margin:8px 0 6px">FAQ</h3>
+      <details><summary><strong>What is drop-frame timecode?</strong></summary>
+        <p style="color:var(--muted)">Drop-frame compensates for NTSC frame rates like 29.97 and 59.94 by skipping timecode numbers each minute (except every tenth) so the timecode clock stays close to real time. This tool formats drop-frame with a semicolon (<span class="mono">HH:MM:SS;FF</span>) and uses correct drop rules in calculations.</p>
+      </details>
+      <details><summary><strong>Can I set custom FPS?</strong></summary>
+        <p style="color:var(--muted)">Yes. Choose a preset or enter a custom value; frame pickers update automatically to the active FPS.</p>
+      </details>
+    </section>
+  </div>
+
+  <script>
+    // ====== Helpers & Settings ======
+    const $ = (q) => document.querySelector(q);
+    const $$ = (q) => Array.from(document.querySelectorAll(q));
+    const z = (n,w=2)=> String(Math.max(0, Math.floor(Math.abs(Number(n))))).padStart(w,'0');
+    const settings = { get(k,d){ try{ const v=localStorage.getItem('tfc:'+k); return v==null?d:JSON.parse(v);}catch{return d;} }, set(k,v){ try{ localStorage.setItem('tfc:'+k, JSON.stringify(v)); }catch{} } };
+
+    function applyTheme(){ const dark = settings.get('theme','light')==='dark'; document.documentElement.classList.toggle('dark', dark); reflectTheme(); }
+    function reflectTheme(){ const dark = document.documentElement.classList.contains('dark'); const btnL=$('#theme-light'), btnD=$('#theme-dark'); if(btnL&&btnD){ btnL.classList.toggle('active', !dark); btnD.classList.toggle('active', dark); btnL.setAttribute('aria-pressed', String(!dark)); btnD.setAttribute('aria-pressed', String(dark)); }}
+
+    function formatMS(totalSeconds){ const sign=totalSeconds<0?'-':''; const abs=Math.abs(Math.floor(totalSeconds)); const m=Math.floor(abs/60); const s=abs%60; return `${sign}${z(m)}:${z(s)}`; }
+    function formatHMS(totalSeconds){ const sign=totalSeconds<0?'-':''; const abs=Math.abs(Math.floor(totalSeconds)); const h=Math.floor(abs/3600); const m=Math.floor((abs%3600)/60); const s=abs%60; return `${sign}${z(h)}:${z(m)}:${z(s)}`; }
+    function formatHMSF(h,m,s,f,sep=':'){ const sign=h<0?'-':''; const H=z(Math.abs(h)); const core=`${H}:${z(m)}:${z(s)}`; const tail=(sep===';')?`;${z(f)}`:`:${z(f)}`; return `${sign}${core}${tail}`; }
+
+    function framesToDropFrameHMSF(totalFrames,fps){ const is59=Math.abs(fps-59.94)<0.01; const nominal=is59?60:30; const drop=is59?4:2; const per10=nominal*600 - drop*9; const perHr=per10*6; let f=((totalFrames%perHr)+perHr)%perHr; const h=Math.floor(f/perHr); f%=perHr; const tens=Math.floor(f/per10); f%=per10; let m=tens*10; const perMin=nominal*60-drop; const minsLeft=Math.floor(f/perMin); m+=minsLeft; f%=perMin; const s=Math.floor(f/nominal); const fr=f%nominal; return {h,m,s,f:fr}; }
+    function hmsfDropFrameToFrames(h,m,s,f,fps){ const is59=Math.abs(fps-59.94)<0.01; const nominal=is59?60:30; const drop=is59?4:2; const totalMin=h*60+m; const dropped=drop*(totalMin-Math.floor(totalMin/10)); return (h*3600+m*60+s)*nominal + f - dropped; }
+    function shouldUseDropFrame(fps,df){ return df && (Math.abs(fps-29.97)<0.01 || Math.abs(fps-59.94)<0.01); }
+    function hmsfToTotalFrames(h,m,s,f,fps,df){ if(shouldUseDropFrame(fps,df)) return hmsfDropFrameToFrames(h,m,s,f,fps); return Math.round((h*3600+m*60+s)*fps + f); }
+    function totalFramesToHMSF(total,fps,df){ if(shouldUseDropFrame(fps,df)){ const {h,m,s,f}=framesToDropFrameHMSF(total,fps); return {h,m,s,f,sep:';'}; } const frames=Math.abs(Math.round(total)); const base=Math.max(1,Math.round(fps)); const t=Math.floor(frames/base); const f=t===0?frames:frames%base; const h=Math.floor(t/3600); const m=Math.floor((t%3600)/60); const s=t%60; return {h,m,s,f,sep:':'}; }
+
+    // ====== Global state ======
+    const presetFps=[12,24,25,29.97,30,59.94,60,120];
+    let fps = Number(settings.get('fps',24));
+    let dropFrame = !!settings.get('drop',false);
+
+    function updateFpsDisplays(){ $('#active-fps').value=fps; $('#hmsf-fps-label').textContent=fps; $$('.hmsf-fps').forEach(el=> el.textContent=fps); const isCustom=!presetFps.includes(fps); const wrap=$('#custom-fps-wrap'); const input=$('#custom-fps'); if(isCustom){ wrap.classList.remove('faded'); input.disabled=false; } else { wrap.classList.add('faded'); input.disabled=true; } }
+    function setFps(v){ if(!v||Number.isNaN(v)||v<=0) return; fps=Number(v); settings.set('fps',fps); updateFpsDisplays(); buildPickers(); updateAll(); renderFpsPills(); }
+    function renderFpsPills(){ const c=$('#fps-pills'); c.innerHTML=''; presetFps.forEach(p=>{ const b=document.createElement('button'); b.className='pill'+(fps===p?' active':''); b.textContent=p; b.type='button'; b.setAttribute('aria-pressed', String(fps===p)); b.addEventListener('click',()=> setFps(p)); c.appendChild(b); }); const b=document.createElement('button'); const isCustom=!presetFps.includes(fps); b.className='pill'+(isCustom?' active':''); b.textContent='Custom'; b.type='button'; b.setAttribute('aria-pressed', String(isCustom)); b.addEventListener('click',()=>{ const v=Number($('#custom-fps').value); if(!Number.isNaN(v)&&v>0) setFps(v); $('#custom-fps').focus(); }); c.appendChild(b); }
+
+    function fillSelect(sel,max){ sel.innerHTML=''; for(let i=0;i<=max;i++){ const o=document.createElement('option'); o.value=String(i); o.textContent=String(i).padStart(2,'0'); sel.appendChild(o);} }
+    function clamp(v,min,max){ return Math.min(Math.max(v,min),max); }
+
+    let pickH,pickM,pickS,pickF,hmsfH,hmsfM,hmsfS,hmsfF,calcH,calcM,calcS,calcF;
+    function buildPickers(){ pickH=$('#pick-h'); pickM=$('#pick-m'); pickS=$('#pick-s'); pickF=$('#pick-f'); hmsfH=$('#hmsf-h'); hmsfM=$('#hmsf-m'); hmsfS=$('#hmsf-s'); hmsfF=$('#hmsf-f'); calcH=$('#calc-h'); calcM=$('#calc-m'); calcS=$('#calc-s'); calcF=$('#calc-f'); [pickH,hmsfH,calcH].forEach(s=> s&&fillSelect(s,23)); [pickM,hmsfM,calcM].forEach(s=> s&&fillSelect(s,59)); [pickS,hmsfS,calcS].forEach(s=> s&&fillSelect(s,59)); const base=shouldUseDropFrame(fps,dropFrame)?(Math.abs(fps-59.94)<0.01?60:30):Math.max(1,Math.round(fps)); const maxF=Math.max(0,base-1); [pickF,hmsfF,calcF].forEach(s=> s&&fillSelect(s,maxF)); }
+
+    function setValidity(el,ok){ if(el) el.classList.toggle('invalid',!ok); }
+    function setOut(id,val){ const el=$(id); if(el) el.textContent=String(val); }
+    function echoParsed(id,p,frames){ const el=$(id); if(!el) return; const sep=shouldUseDropFrame(fps,dropFrame)?';':':'; const hmsf=formatHMSF(p.h||0,p.m||0,p.s||0,p.hasFrames?p.f||0:0,sep); el.textContent=`Parsed as ${hmsf} (${frames} frames) @ ${fps}${shouldUseDropFrame(fps,dropFrame)?' DF':''}`; }
+
+    function updateFlexible(){ const box=$('#flex-input'); const p=parseTimecode(box.value); setValidity(box,p.valid); pickH&&(pickH.value=String(clamp(p.h||0,0,23))); pickM&&(pickM.value=String(clamp(p.m||0,0,59))); pickS&&(pickS.value=String(clamp(p.s||0,0,59))); pickF&&(pickF.value=String(clamp(p.hasFrames?p.f:0,0,999))); const total=hmsfToTotalFrames(p.h,p.m,p.s,p.hasFrames?p.f:0,fps,dropFrame); const tf=totalFramesToHMSF(total,fps,dropFrame); const secs=Math.floor(total/(shouldUseDropFrame(fps,dropFrame)?(Math.abs(fps-59.94)<0.01?60:30):fps)); echoParsed('#flex-echo',p,total); setOut('#out-flex-seconds',secs); setOut('#out-flex-ms',formatMS(secs)); setOut('#out-flex-hms',formatHMS(secs)); setOut('#out-flex-frames',total); setOut('#out-flex-hmsf',formatHMSF(tf.h,tf.m,tf.s,tf.f,tf.sep)); }
+    function hookFlexiblePickers(){ [pickH,pickM,pickS,pickF].forEach(s=> s&&s.addEventListener('change',()=>{ $('#flex-input').value=`${z(pickH.value)}:${z(pickM.value)}:${z(pickS.value)}:${z(pickF.value)}`; updateFlexible(); })); }
+
+    function updateSeconds(){ const box=$('#seconds-input'); const sec=Number(box.value); const ok=!Number.isNaN(sec)&&sec>=0; setValidity(box,ok); const frames=Math.round((ok?sec:0)*(shouldUseDropFrame(fps,dropFrame)?(Math.abs(fps-59.94)<0.01?60:30):fps)); const tf=totalFramesToHMSF(frames,fps,dropFrame); echoParsed('#sec-echo',{h:tf.h,m:tf.m,s:tf.s,f:tf.f,hasFrames:true},frames); setOut('#out-sec-ms',formatMS(ok?sec:0)); setOut('#out-sec-hms',formatHMS(ok?sec:0)); setOut('#out-sec-frames',frames); setOut('#out-sec-hmsf',formatHMSF(tf.h,tf.m,tf.s,tf.f,tf.sep)); }
+
+    function updateHMSF(){ const box=$('#hmsf-input'); const p=parseTimecode(box.value); setValidity(box,p.valid); hmsfH&&(hmsfH.value=String(clamp(p.h||0,0,23))); hmsfM&&(hmsfM.value=String(clamp(p.m||0,0,59))); hmsfS&&(hmsfS.value=String(clamp(p.s||0,0,59))); hmsfF&&(hmsfF.value=String(clamp(p.hasFrames?p.f:0,0,999))); const frames=hmsfToTotalFrames(p.h,p.m,p.s,p.hasFrames?p.f:0,fps,dropFrame); const tf=totalFramesToHMSF(frames,fps,dropFrame); const seconds=Math.floor(frames/(shouldUseDropFrame(fps,dropFrame)?(Math.abs(fps-59.94)<0.01?60:30):fps)); echoParsed('#hmsf-echo',p,frames); setOut('#out-hmsf-frames',frames); setOut('#out-hmsf-seconds',seconds); setOut('#out-hmsf-ms',formatMS(seconds)); setOut('#out-hmsf-hms',formatHMS(seconds)); }
+    function hookHmsfPickers(){ [hmsfH,hmsfM,hmsfS,hmsfF].forEach(s=> s&&s.addEventListener('change',()=>{ $('#hmsf-input').value=`${z(hmsfH.value)}:${z(hmsfM.value)}:${z(hmsfS.value)}:${z(hmsfF.value)}`; updateHMSF(); })); }
+
+    function updateCalc(){ const box=$('#calc-input'); const p=parseTimecode(box.value); setValidity(box,p.valid); calcH&&(calcH.value=String(clamp(p.h||0,0,23))); calcM&&(calcM.value=String(clamp(p.m||0,0,59))); calcS&&(calcS.value=String(clamp(p.s||0,0,59))); calcF&&(calcF.value=String(clamp(p.hasFrames?p.f:0,0,999))); const total=hmsfToTotalFrames(p.h,p.m,p.s,p.hasFrames?p.f:0,fps,dropFrame); const op=$('#calc-op').value; const by=Number($('#calc-by').value)||1; let res=total; if(op==='mul') res=Math.round(total*by); if(op==='div') res=by===0?0:Math.round(total/by); const tf=totalFramesToHMSF(res,fps,dropFrame); const secs=Math.floor(res/(shouldUseDropFrame(fps,dropFrame)?(Math.abs(fps-59.94)<0.01?60:30):fps)); $('#calc-echo').textContent=`Parsed as ${formatHMSF(p.h||0,p.m||0,p.s||0,p.hasFrames?p.f||0:0, shouldUseDropFrame(fps,dropFrame)?';':':')} (${total} frames)`; setOut('#calc-out-hmsf',formatHMSF(tf.h,tf.m,tf.s,tf.f,tf.sep)); setOut('#calc-out-hms',formatHMS(secs)); setOut('#calc-out-ms',formatMS(secs)); setOut('#calc-out-seconds',secs); setOut('#calc-out-frames',res); }
+    function hookCalcPickers(){ [calcH,calcM,calcS,calcF].forEach(s=> s&&s.addEventListener('change',()=>{ $('#calc-input').value=`${z(calcH.value)}:${z(calcM.value)}:${z(calcS.value)}:${z(calcF.value)}`; updateCalc(); })); $('#calc-op').addEventListener('change',updateCalc); $('#calc-by').addEventListener('input',updateCalc); }
+
+    function makeAddRow(i){ const w=document.createElement('div'); w.className='card'; w.style.marginTop='8px'; w.innerHTML=`<label>Time ${i+1} (SS, MM:SS, HH:MM:SS, or HH:MM:SS:FF)</label><input type=\"text\" class=\"add-input\" data-idx=\"${i}\" value=\"00:00:00:00\" /><p class=\"mono add-echo\" id=\"add-echo-${i}\" style=\"color:var(--muted)\"></p><div class=\"picker-grid\"><div><label>Hours</label><select class=\"add-h\" data-idx=\"${i}\"></select></div><div><label>Minutes</label><select class=\"add-m\" data-idx=\"${i}\"></select></div><div><label>Seconds</label><select class=\"add-s\" data-idx=\"${i}\"></select></div><div><label>Frames</label><select class=\"add-f\" data-idx=\"${i}\"></select></div></div>`; return w; }
+    function buildAddList(count){ const c=$('#add-list'); c.innerHTML=''; for(let i=0;i<count;i++) c.appendChild(makeAddRow(i)); $$('.add-h').forEach(s=>fillSelect(s,23)); $$('.add-m').forEach(s=>fillSelect(s,59)); $$('.add-s').forEach(s=>fillSelect(s,59)); const base=shouldUseDropFrame(fps,dropFrame)?(Math.abs(fps-59.94)<0.01?60:30):Math.max(1,Math.round(fps)); const maxF=Math.max(0,base-1); $$('.add-f').forEach(s=>fillSelect(s,maxF)); $$('.add-input').forEach(inp=> inp.addEventListener('input',updateAdd)); ['.add-h','.add-m','.add-s','.add-f'].forEach(cls=>{ $$(cls).forEach(s=> s.addEventListener('change',()=>{ const p=s.closest('.card'); const H=p.querySelector('.add-h').value; const M=p.querySelector('.add-m').value; const S=p.querySelector('.add-s').value; const F=p.querySelector('.add-f').value; p.querySelector('.add-input').value=`${z(H)}:${z(M)}:${z(S)}:${z(F)}`; updateAdd(); })); }); updateAdd(); }
+    function updateAdd(){ const ins=$$('.add-input'); const arr=[]; ins.forEach((inp,i)=>{ const p=parseTimecode(inp.value); const frames=hmsfToTotalFrames(p.h,p.m,p.s,p.hasFrames?p.f:0,fps,dropFrame); const echo=$(`#add-echo-${i}`); if(echo) echo.textContent=`Parsed as ${formatHMSF(p.h||0,p.m||0,p.s||0,p.hasFrames?p.f||0:0, shouldUseDropFrame(fps,dropFrame)?';':':')} (${frames} frames) @ ${fps}${shouldUseDropFrame(fps,dropFrame)?' DF':''}`; const card=inp.closest('.card'); card.querySelector('.add-h').value=String(clamp(p.h||0,0,23)); card.querySelector('.add-m').value=String(clamp(p.m||0,0,59)); card.querySelector('.add-s').value=String(clamp(p.s||0,0,59)); card.querySelector('.add-f').value=String(clamp(p.hasFrames?p.f:0,0,999)); arr.push(frames); }); const op=$('#add-op').value; let total=0; if(op==='sum'){ total=arr.reduce((a,b)=>a+b,0); } else { if(arr.length>0){ total=arr[0]; for(let i=1;i<arr.length;i++) total-=arr[i]; } } const tf=totalFramesToHMSF(total,fps,dropFrame); const sec=Math.floor(total/(shouldUseDropFrame(fps,dropFrame)?(Math.abs(fps-59.94)<0.01?60:30):fps)); setOut('#add-out-hmsf',formatHMSF(tf.h,tf.m,tf.s,tf.f,tf.sep)); setOut('#add-out-hms',formatHMS(sec)); setOut('#add-out-ms',formatMS(sec)); setOut('#add-out-seconds',sec); setOut('#add-out-frames',total); }
+
+    // Parsing shared
+    function parseTimecode(str){ const raw=(str||'').trim(); if(!raw) return {h:0,m:0,s:0,f:0,hasFrames:false,valid:true}; if(raw.includes(':')){ const parts=raw.split(':').map(p=>p.trim()); const mode3=settings.get('interpret3','hms'); if(parts.length===2){ const [m,s]=parts.map(Number); const ok=![m,s].some(Number.isNaN)&&m>=0&&s>=0&&s<60; return {h:0,m:Math.abs(Math.floor(m||0)),s:Math.abs(Math.floor(s||0)),f:0,hasFrames:false,valid:ok}; } if(parts.length===3){ if(mode3==='msf'){ const [m,s,f]=parts.map(Number); const ok=![m,s,f].some(Number.isNaN)&&m>=0&&s>=0&&s<60&&f>=0; return {h:0,m:Math.abs(Math.floor(m||0)),s:Math.abs(Math.floor(s||0)),f:Math.abs(Math.floor(f||0)),hasFrames:true,valid:ok}; } else { const [h,m,s]=parts.map(Number); const ok=![h,m,s].some(Number.isNaN)&&m>=0&&m<60&&s>=0&&s<60&&h>=0; return {h:Math.abs(Math.floor(h||0)),m:Math.abs(Math.floor(m||0)),s:Math.abs(Math.floor(s||0)),f:0,hasFrames:false,valid:ok}; } } if(parts.length===4){ const [h,m,s,f]=parts.map(Number); const ok=![h,m,s,f].some(Number.isNaN)&&m>=0&&m<60&&s>=0&&s<60&&f>=0; return {h:Math.abs(Math.floor(h||0)),m:Math.abs(Math.floor(m||0)),s:Math.abs(Math.floor(s||0)),f:Math.abs(Math.floor(f||0)),hasFrames:true,valid:ok}; } } const sec=Number(raw); const valid=!Number.isNaN(sec)&&sec>=0; if(!valid) return {h:0,m:0,s:0,f:0,hasFrames:false,valid:false}; const whole=Math.floor(Math.abs(sec)); return {h:0,m:Math.floor(whole/60),s:whole%60,f:0,hasFrames:false,valid:true}; }
+
+    // ====== Init ======
+    function updateAll(){ updateFlexible(); updateSeconds(); updateHMSF(); updateCalc(); updateAdd(); }
+    function resetFlexible(){ $('#flex-input').value='00:00:00:00'; updateFlexible(); }
+    function resetSeconds(){ $('#seconds-input').value='0'; updateSeconds(); }
+    function resetHmsf(){ $('#hmsf-input').value='00:00:00:00'; updateHMSF(); }
+    function resetCalc(){ $('#calc-input').value='00:00:00:00'; $('#calc-op').value='div'; $('#calc-by').value='1'; updateCalc(); }
+    function resetAdd(){ $('#add-op').value='sum'; $('#add-more-toggle').checked=false; $('#add-count').value='2'; $('#add-count-wrap').classList.add('hidden'); buildAddList(2); updateAdd(); }
+    function buildAddCount(){ const sel=$('#add-count'); sel.innerHTML=''; for(let i=2;i<=10;i++){ const o=document.createElement('option'); o.value=String(i); o.textContent=String(i); sel.appendChild(o);} sel.value='2'; }
+
+    function bindTheme(){ $('#theme-light').addEventListener('click',()=>{ settings.set('theme','light'); applyTheme(); }); $('#theme-dark').addEventListener('click',()=>{ settings.set('theme','dark'); applyTheme(); }); applyTheme(); }
+
+    function init(){
+      // restore
+      $('#interpret-3').value=settings.get('interpret3','hms');
+      $('#interpret-3').addEventListener('change',e=>{ settings.set('interpret3',e.target.value); updateAll(); });
+      $('#drop-frame').checked=dropFrame; $('#drop-frame').addEventListener('change',e=>{ dropFrame=e.target.checked; settings.set('drop',dropFrame); buildPickers(); updateAll(); });
+      bindTheme();
+      renderFpsPills(); updateFpsDisplays(); buildPickers();
+      // inputs
+      $('#flex-input').addEventListener('input',updateFlexible);
+      $('#seconds-input').addEventListener('input',updateSeconds);
+      $('#hmsf-input').addEventListener('input',updateHMSF);
+      $('#calc-input').addEventListener('input',updateCalc);
+      $('#calc-op').addEventListener('change',updateCalc);
+      $('#calc-by').addEventListener('input',updateCalc);
+      $('#custom-fps').addEventListener('input',()=>{ const v=Number($('#custom-fps').value); if(!Number.isNaN(v)&&v>0) setFps(v); });
+      // pickers
+      hookFlexiblePickers(); hookHmsfPickers(); hookCalcPickers();
+      // add/subtract
+      buildAddCount();
+      const addMore=$('#add-more-toggle'); const addWrap=$('#add-count-wrap');
+      addMore.addEventListener('change',()=>{ if(addMore.checked){ addWrap.classList.remove('hidden'); } else { addWrap.classList.add('hidden'); $('#add-count').value='2'; } buildAddList(Number($('#add-count').value)); });
+      $('#add-count').addEventListener('change',()=> buildAddList(Number($('#add-count').value)) );
+      buildAddList(2);
+      // reset buttons
+      $('#reset-flex').addEventListener('click',resetFlexible);
+      $('#reset-seconds').addEventListener('click',resetSeconds);
+      $('#reset-hmsf').addEventListener('click',resetHmsf);
+      $('#reset-calc').addEventListener('click',resetCalc);
+      $('#reset-add').addEventListener('click',resetAdd);
+      updateAll();
+    }
+
+    // Robust startup
+    window.addEventListener('DOMContentLoaded', ()=>{
+      try{ init(); }catch(e){ console.error('Init error', e); }
+      // Safety repopulation for selects
+      setTimeout(()=>{ try{ buildPickers(); }catch(e){}
+        const ensureFilled=(sel,max)=>{ if(sel && sel.options.length===0){ for(let i=0;i<=max;i++){ const o=document.createElement('option'); o.value=String(i); o.textContent=String(i).padStart(2,'0'); sel.appendChild(o);} } };
+        ['#pick-h','#hmsf-h','#calc-h'].forEach(id=> ensureFilled(document.querySelector(id),23));
+        ['#pick-m','#pick-s','#hmsf-m','#hmsf-s','#calc-m','#calc-s'].forEach(id=> ensureFilled(document.querySelector(id),59));
+        const base=shouldUseDropFrame(fps,dropFrame)?(Math.abs(fps-59.94)<0.01?60:30):Math.max(1,Math.round(fps));
+        const maxF=Math.max(0,base-1);
+        ['#pick-f','#hmsf-f','#calc-f'].forEach(id=> ensureFilled(document.querySelector(id),maxF));
+      }, 50);
+    });
+  </script>
+</body>
+</html>
